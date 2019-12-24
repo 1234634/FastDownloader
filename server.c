@@ -23,12 +23,12 @@
 #include<unistd.h>    //write
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27018
+#define DEFAULT_PORT   27019
 #define MAX_FILES 20
 int main(int argc , char *argv[])
 {
     int socket_desc , client_sock , c , read_size;
-    struct sockaddr_in server ,server1,client;
+    struct sockaddr_in server ,client;
     char client_message[DEFAULT_BUFLEN];
     char* available_files;
     available_files = "Need for speed ;Slender man ;Counterstrike 1.6 v42 ;HALF LIFE;";
@@ -71,84 +71,24 @@ int main(int argc , char *argv[])
   
 
 
-
-
   /////////////////////////////////////////////////////////////////////////////
    
 
-    int socket_sender = socket(AF_INET , SOCK_STREAM , 0);
-    if (socket_desc == -1)
-    {
-        printf("Could not create socket");
-    }
-    puts("Socket sender created ");
-
-
-
-
-
-   // while( (read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0)) > 0 )
-     read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0);
-    //{
-        printf("Bytes received: %d\n", read_size);
-    //}
- 
-    printf("Message recieved: %s\n",client_message);
-    
-	
-read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0);
-
-    printf("Message recieved: %s\n",client_message);
-
-    
-
-    //Prepare the sockaddr_in structure, adress of the socket prep
-    server1.sin_family = AF_INET;
-    server1.sin_addr.s_addr = client.sin_addr.s_addr;
-    server1.sin_port = htons(27017); //Bind socket that contains protocol info + socket_addr 
-    //Connect to remote server
-    if (connect(socket_sender , (struct sockaddr *)&server1 , sizeof(server)) < 0)
-    {
-        perror("connect failed. Error");
-        return 1;
-    }
-	printf("Passed the connect");
-
-    if(send(client_sock, available_files, strlen(available_files),0) < 0) 
-    {
-    	puts("Send failed");
-	return 1;	
-    }
-	
-    printf("Sending done");
-	
-
-
-    //Receive a message from client
-    
-
-   
-    
-    
-    
-    
-    /*// lets see what is asked to be downloaded
-	switch(client_message[0])
-	{
-		case 't':
-			printf("Downloading t\n");
-			break;
-		default:
-			printf("We don't have that file");
-			break;
-	
-	}*/
-
     while( (read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0)) > 0 )
     {
-        printf("Bytes received: %d\n", read_size);
+   	 printf("Bytes received: %d\n", read_size);
+    	printf("Message recieved: %s\n",client_message);
+    	if(send(client_sock, available_files, strlen(available_files),0) < 0) 
+    	{
+    		puts("Send failed");
+		return 1;	
+    	}
+	
+    	printf("Sending done");
     }
  
+    
+
     printf("Message recieved: %s\n",client_message);
 
     if(read_size == 0)

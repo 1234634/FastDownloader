@@ -24,7 +24,7 @@
 #include <unistd.h>    //for close
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27018
+#define DEFAULT_PORT   27019
 #define CLIENT_PORT 27017
 
 int main(int argc , char *argv[])
@@ -53,15 +53,6 @@ int main(int argc , char *argv[])
         return 1;
     }
 
-    //Create socket
-    sock_desc = socket(AF_INET , SOCK_STREAM , 0);
-    if (sock_desc == -1)
-    {
-        printf("Could not create socket");
-    }
-
-
-    puts("Socket created");
     
     //Send some data
     if( send(sock , message , strlen(message), 0) < 0)
@@ -74,36 +65,8 @@ int main(int argc , char *argv[])
     puts(message);
 
 
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(CLIENT_PORT);
-    
-    if( bind(sock_desc,(struct sockaddr*)&server, sizeof(server))<0)
-    {
-    	perror("bind failed");
-	return 1;
-    }    
-
-
-
-    //Listen (socket,num.  of max connections)
-    listen(sock_desc , 3);
-
-    //Accept and incoming connection
-    puts("Waiting for incoming connections...");
-    c = sizeof(struct sockaddr_in);
-
-    //accept connection from an incoming client
-    client_sock = accept(sock_desc, (struct sockaddr *)&client, (socklen_t*)&c);
-    if (client_sock < 0)
-    {
-        perror("accept failed");
-        return 1;
-    }
-    puts("Connection accepted");
-	
     //Receive a message from client
-    while( (read_size = recv(sock_desc , available_files , DEFAULT_BUFLEN , 0)) > 0 )
+     (read_size = recv(sock , available_files , DEFAULT_BUFLEN , 0)); 
     {
         printf("Bytes received: %d\n", read_size);
     }
@@ -112,7 +75,7 @@ int main(int argc , char *argv[])
     puts("Connected\n");
     
     close(sock);
-    close(sock_desc);
+    //close(sock_desc);
     return 0;
 }
 
