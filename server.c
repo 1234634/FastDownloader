@@ -28,6 +28,9 @@
 #define DEFAULT_PORT   27018
 #define MAX_FILES 20
 #define FILES_NUMBER 4
+#define MESSAGE_ID "[%d]"
+#define DEFAULT_FLEN 30
+#define DEFAULT_THREADSNUM 3 
 
 pthread_mutex_t lock;
 typedef struct Packets
@@ -37,11 +40,13 @@ typedef struct Packets
 
 }Packet;
 
+
+
+
 void *sendingThread(void *arg_packet)
 {
 	Packet* sendingData = arg_packet;
 	char recievedMessage[DEFAULT_BUFLEN];
-	int readSize;
 
 	pthread_mutex_lock(&lock);
 
@@ -51,7 +56,7 @@ void *sendingThread(void *arg_packet)
 			return NULL;	
    	 	}
 		
-	readSize = recv(sendingData->socket , recievedMessage , DEFAULT_BUFLEN , 0);
+	recv(sendingData->socket , recievedMessage , DEFAULT_BUFLEN , 0);
 	printf("message recieved %s \n",recievedMessage);
 	
 	pthread_mutex_unlock(&lock);
@@ -63,11 +68,10 @@ void *sendingThread(void *arg_packet)
 int fileSize(FILE* argFp)
 {
 	int size;
+	
 	fseek(argFp, 0, SEEK_END); // seek to end of file
 	size = ftell(argFp); // get current file pointer
 	fseek(argFp, 0, SEEK_SET); // seek back to beginning of file
-	// proceed with allocating memory and reading the file
-	printf("size is %d",size);
 	
 	return size;
 
@@ -76,15 +80,13 @@ int fileSize(FILE* argFp)
 
 void fileChunking(FILE * argFp, int argBegin, int argEnd, char (* argBuffer)[DEFAULT_BUFLEN])
 {
-	int length,bytesRead;
+	int length,idOffset = strlen(*argBuffer);
+	length = argEnd - argBegin;
+	
 	if (argFp != NULL)    
 	{	
-  		// read up to sizeof(buffer) bytes
-		fseek(argFp,argBegin,SEEK_SET);
-		 length = argEnd - argBegin;
-  		bytesRead = fread(*argBuffer, 1,length , argFp);
-   		// process bytesRead worth of data in bufferi
-		 printf("bytes red %d and what %s\n",bytesRead,*argBuffer);
+  		fseek(argFp, argBegin, SEEK_SET);
+  		fread((*argBuffer+idOffset), 1, length, argFp);
   		
 	}	
 
@@ -94,16 +96,16 @@ void fileChunking(FILE * argFp, int argBegin, int argEnd, char (* argBuffer)[DEF
 int main(int argc , char *argv[])
 {
     int socket_desc , client_sock , c , read_size,threadsNumber,i;
-    char client_message[DEFAULT_BUFLEN],availableFiles[DEFAULT_BUFLEN];
-    char availableFilesArr[FILES_NUMBER][40] = {"Need for speed","Slenderman","JazzJackabit","Fifa08"};
-    char fileName[30];
+    char client_message[DEFAULT_BUFLEN],availableFiles[DEFAULT_BUFLEN],serverMessage[DEFAULT_BUFLEN];
+    char availableFilesArr[FILES_NUMBER][DEFAULT_BUFLEN] = {"Need for speed","Slenderman","JazzJackabit","Fifa08"};
+    char fileName[DEFAULT_FLEN];
     FILE *fp; 
     struct sockaddr_in server ,client;
     
     
     if( argc < 2)
     {
-    	threadsNumber = 3;
+    	threadsNumber = DEFAULT_THREADSNUM;
     }
     else
     {
@@ -161,72 +163,79 @@ int main(int argc , char *argv[])
 
     while( (read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0)) > 0 )
     {
-   	printf("Bytes received: %d\n", read_size);
-    	printf("Message recieved: %s\n",client_message);
 
-	memset(availableFiles,0,sizeof(availableFiles));
-
+	snprintf(serverMessage,sizeof(serverMessage),"%d",threadsNumber);
+    	
+	// Sending the number of threads 
+	if(send(client_sock, serverMessage, sizeof(serverMessage), 0) < 0) 
+    	{
+    		puts("Send failed");
+		return 1;	
+    	}
+    	printf("The number of threads: %d, has been sent \n",threadsNumber);
+	
+	memset(availableFiles, 0, sizeof(availableFiles));
+	
 	for( i=0; i <  FILES_NUMBER; i++)
 	{	
 		strcat(availableFiles,availableFilesArr[i]);
 		strcat(availableFiles," ; ");
 	}
+	
+	//Sending available files
     	if(send(client_sock, availableFiles, strlen(availableFiles),0) < 0) 
     	{
     		puts("Send failed");
 		return 1;	
     	}
-	
-    	printf("Sending done \n ");
+    	printf("Available files have been sent \n");
 
+	//recieve which file does client want to download
 	memset(client_message,0,sizeof(client_message));
-	(read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0));//which file
-
-	printf("message recieved %s\n",client_message);
+	recv(client_sock , client_message , DEFAULT_BUFLEN , 0);
+	printf("Client demanding file number: %s\n",client_message);
 	
+
 	int num = atoi(client_message);
+	if( num < 0 || num > FILES_NUMBER)
+	{
+		printf("file number out of range \n");
+		return 1;
+	}	
 	memset(fileName, 0 , sizeof(fileName));
 	strcpy(fileName,availableFilesArr[num]);
 	printf("File name %s \n",fileName);
 	
+	//opening the file
 	fp = fopen(fileName, "r");
 
 	if (fp == NULL)
 	{
-		printf("Requested file can't be sended");
+		printf("Requested file can't be sent");
 		exit(1);
 	}
-	
-	printf ("Odje");
-	fileSize(fp);
-
-	// split the file into buffers and put the number on each one 
+ 
 
 	pthread_t *tid =(pthread_t*) malloc(threadsNumber * sizeof(pthread_t));
-	Packet tempPacket;
-	void ** arg_Packet = (void **) malloc(threadsNumber * sizeof(void*));
+	Packet *tempPacket= (Packet *) malloc(threadsNumber* sizeof(Packet));
+	void * argPacket;
 	int size = fileSize(fp),begin,end;
-	//memset(tempPacket.message,0,30);
-	fileSize(fp);
-
+	
 	for(i= 0; i < threadsNumber; i++)
 	{	
-	/*	begin = i*size/threadsNumber;
-		if( i== threadsNumber-1)
+		begin = i*size/threadsNumber;
+		if( i== threadsNumber-1) //because size might not be dividable with thredsNumber
 			end = size;
 		else
 			end = (i+1)*size/threadsNumber;
-	*/
-		begin=0;
-		end = 3;
-		
-		printf("Proso ovde %d", i);
+	
 
-	        fileChunking(fp,begin,end,&tempPacket.message);
-		tempPacket.socket = client_sock;
-		arg_Packet[i]= &tempPacket ;
-	//	memset(tempPacket.message,0,sizeof(tempPacket));
-		pthread_create(&(tid[i]),NULL,&sendingThread,arg_Packet[i]); 
+		snprintf(tempPacket[i].message, sizeof(tempPacket[i].message),MESSAGE_ID,i);
+	        fileChunking(fp,begin,end,&tempPacket[i].message);
+		tempPacket[i].socket = client_sock;
+		argPacket= &tempPacket[i];
+
+		pthread_create(&(tid[i]),NULL,&sendingThread,argPacket); 
 	}
 
 	for(i= 0; i < threadsNumber; i++)
@@ -235,7 +244,7 @@ int main(int argc , char *argv[])
 	} 
  	
 	fclose(fp);
-   	free(arg_Packet);
+   	free(tempPacket);
    	free( tid);
     }
  
