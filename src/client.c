@@ -18,20 +18,22 @@
 
 #include<stdio.h>      //printf
 #include<string.h>     //strlen
+#include<stdlib.h>
 #include<sys/socket.h> //socket
 #include<arpa/inet.h>  //inet_addr
 #include <fcntl.h>     //for open
 #include <unistd.h>    //for close
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27019
+#define DEFAULT_PORT   27018
 #define CLIENT_PORT 27017
 
 int main(int argc , char *argv[])
 {
-    int c,sock,sock_desc,read_size,client,client_sock;
+    int sock,read_size,brNiti=3;
     struct sockaddr_in server;
     char *message = "this is a test";
+    char *mes = "1";
     char available_files[DEFAULT_BUFLEN];
 
     //Create socket
@@ -55,27 +57,54 @@ int main(int argc , char *argv[])
 
     
     //Send some data
-    if( send(sock , message , strlen(message), 0) < 0)
+    if( send(sock , message, strlen(message), 0) < 0)
     {
         puts("Send failed");
         return 1;
     }
 
-    puts("Client message:");
-    puts(message);
-
-
-    //Receive a message from client
      (read_size = recv(sock , available_files , DEFAULT_BUFLEN , 0)); 
     {
         printf("Bytes received: %d\n", read_size);
     }
  
+    int threadsNumber = atoi(available_files);
     printf("Message recieved: %s\n",available_files);
-    puts("Connected\n");
+    char newMes[100][512];
+   // char** newMes= (char**) malloc(threadsNumber * sizeof(sizeof(char)*512));
+    memset(available_files,0,sizeof(available_files));
+    //Receive a message from client
+     (read_size = recv(sock , available_files , DEFAULT_BUFLEN , 0)); 
+    {
+        printf("Bytes received: %d\n", read_size);
+    }
+    printf("Message recieved: %s\n",available_files);
     
+    
+    //Send some data
+    if( send(sock , mes , strlen(mes), 0) < 0)
+    {
+        puts("Send failed");
+        return 1;
+    }
+
+    int i;
+    for(i=0; i< threadsNumber; i++)
+    {
+    	 (read_size = recv(sock , newMes[i] , sizeof(newMes) , 0)); 
+         printf("Message %d == %s\n", i,newMes[i]);
+
+    	if( send(sock , message , strlen(message), 0) < 0)
+    	{
+        	puts("Send failed");
+        	return 1;
+    	}
+    
+    }    
+
+
     close(sock);
-    //close(sock_desc);
+    
     return 0;
 }
 

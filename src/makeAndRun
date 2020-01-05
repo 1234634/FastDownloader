@@ -1,0 +1,6 @@
+#!/bin/bash
+
+	./compile
+	xterm -hold -e ./client &
+
+	./server $1 
