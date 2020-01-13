@@ -31,12 +31,14 @@
 #define MESSAGE_ID "[%d]"
 #define DEFAULT_FLEN 30
 #define DEFAULT_THREADSNUM 3 
+#define T_SIZE 51
 
 pthread_mutex_t lock;
 typedef struct Packets
 {
 	int socket;
 	char message[DEFAULT_BUFLEN];
+	
 
 }Packet;
 
@@ -53,10 +55,14 @@ void *sendingThread(void *arg_packet)
 	if( send( sendingData->socket , sendingData->message , strlen(sendingData->message ) ,0 ) < 0 ) 
     		{
     			puts("Send failed");
-			return NULL;	
+			exit(0);	
    	 	}
 		
-	recv(sendingData->socket , recievedMessage , DEFAULT_BUFLEN , 0);
+	if(recv(sendingData->socket , recievedMessage , DEFAULT_BUFLEN , 0) <= 0)
+	{
+		puts("Recieve failed");
+		exit(0);
+	}
 	printf("message recieved %s \n",recievedMessage);
 	
 	pthread_mutex_unlock(&lock);
@@ -95,7 +101,7 @@ void fileChunking(FILE * argFp, int argBegin, int argEnd, char (* argBuffer)[DEF
 
 int main(int argc , char *argv[])
 {
-    int socket_desc , client_sock , c , read_size,threadsNumber,i;
+    int socket_desc , client_sock[DEFAULT_THREADSNUM] , c , read_size,threadsNumber,i;
     char client_message[DEFAULT_BUFLEN],availableFiles[DEFAULT_BUFLEN],serverMessage[DEFAULT_BUFLEN];
     char availableFilesArr[FILES_NUMBER][DEFAULT_BUFLEN] = {"Need for speed","Slenderman","JazzJackabit","Fifa08"};
     char fileName[DEFAULT_FLEN];
@@ -136,21 +142,26 @@ int main(int argc , char *argv[])
     puts("bind done");
 
     //Listen (socket,num.  of max connections)
-    listen(socket_desc , 3);
+    listen(socket_desc , DEFAULT_THREADSNUM);
 
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
 
     //accept connection from an incoming client
-    client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
-    if (client_sock < 0)
-    {
-        perror("accept failed");
-        return 1;
-    }
-    puts("Connection accepted");
+    for( i=0; i < DEFAULT_THREADSNUM; i++){ 
+	    
+	    client_sock[i] = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+	    
+	    if (client_sock < 0)
+	    {
+		perror("accept failed ");
+		return 1;
+	    }
+
+	    puts("Connection  accepted");
   
+    }
 
 
   /////////////////////////////////////////////////////////////////////////////
@@ -161,13 +172,13 @@ int main(int argc , char *argv[])
         return 1;
     }
 
-    while( (read_size = recv(client_sock , client_message , DEFAULT_BUFLEN , 0)) > 0 )
+    while( (read_size = recv(client_sock[0] , client_message , DEFAULT_BUFLEN , 0)) > 0 )
     {
 
 	snprintf(serverMessage,sizeof(serverMessage),"%d",threadsNumber);
     	
 	// Sending the number of threads 
-	if(send(client_sock, serverMessage, sizeof(serverMessage), 0) < 0) 
+	if(send(client_sock[0], serverMessage, sizeof(serverMessage), 0) < 0) 
     	{
     		puts("Send failed");
 		return 1;	
@@ -183,7 +194,7 @@ int main(int argc , char *argv[])
 	}
 	
 	//Sending available files
-    	if(send(client_sock, availableFiles, strlen(availableFiles),0) < 0) 
+    	if(send(client_sock[0], availableFiles, strlen(availableFiles),0) < 0) 
     	{
     		puts("Send failed");
 		return 1;	
@@ -192,7 +203,12 @@ int main(int argc , char *argv[])
 
 	//recieve which file does client want to download
 	memset(client_message,0,sizeof(client_message));
-	recv(client_sock , client_message , DEFAULT_BUFLEN , 0);
+	if( recv(client_sock[0] , client_message , DEFAULT_BUFLEN , 0)< 0)
+ 	{
+		puts("Recieve failed");
+		return 1;
+	}
+
 	printf("Client demanding file number: %s\n",client_message);
 	
 
@@ -221,6 +237,17 @@ int main(int argc , char *argv[])
 	void * argPacket;
 	int size = fileSize(fp),begin,end;
 	
+	memset(serverMessage,0,strlen(serverMessage));
+	sprintf(serverMessage,"%d",size);
+	puts(serverMessage);
+	// Sending msg lent 
+	if(send(client_sock[0], serverMessage, sizeof(serverMessage), 0) < 0) 
+    	{
+    		puts("Send failed");
+		return 1;	
+    	}
+    	printf("messages lenth sent  \n");
+	
 	for(i= 0; i < threadsNumber; i++)
 	{	
 		begin = i*size/threadsNumber;
@@ -231,8 +258,10 @@ int main(int argc , char *argv[])
 	
 
 		snprintf(tempPacket[i].message, sizeof(tempPacket[i].message),MESSAGE_ID,i);
-	        fileChunking(fp,begin,end,&tempPacket[i].message);
-		tempPacket[i].socket = client_sock;
+	        
+		fileChunking(fp,begin,end,&tempPacket[i].message);
+		
+		tempPacket[i].socket = client_sock[i];
 		argPacket= &tempPacket[i];
 
 		pthread_create(&(tid[i]),NULL,&sendingThread,argPacket); 
