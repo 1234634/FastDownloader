@@ -1,6 +1,7 @@
 #!/bin/bash
 
 	./compile
-	xterm -hold -e ./client &
+	rm -rf DownloadedFile
+	xterm -hold -e ./client $1 $2 &
 
 	./server $1 

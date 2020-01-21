@@ -24,11 +24,13 @@
 #include <fcntl.h>     //for open
 #include <unistd.h>    //for close
 #include<pthread.h> 
+#include<time.h>
 
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27018
+#define DEFAULT_BUFLEN 20000
+#define DEFAULT_PORT   27019
 #define CLIENT_PORT 27017
-#define DEFAULT_THREADSNUM 3 
+#define DEFAULT_THREADSNUM 10
+#define DEFAULT_FILE_NUM "1" 
 
 typedef struct Packets
 {
@@ -49,7 +51,7 @@ void *recievingThread(void *arg_packet)
 		puts("Recieve failed");
 		exit(0);
 	}
-	printf("message recieved %s \n",recievedData->message);
+	
 	
 	if( send( recievedData->socket , confirmMessage , strlen(confirmMessage ) ,0 ) < 0 ) 
     		{
@@ -60,45 +62,40 @@ void *recievingThread(void *arg_packet)
 	return NULL;
 }
 
-int meniFunction(char argAvailableFiles[DEFAULT_BUFLEN])
-{
-	printf("U meniju ste unesite redni broj fajla:\n\n");
-	
-	char* token = strtok(argAvailableFiles, ";");
-	int i =1,retNum = 0 ;
-
-	while (token != NULL)
-	{
-		printf("%d ",i);
-		puts(token);
-		i++;
-		token = strtok(NULL,";");
-	}
-
-	
-	scanf("%d", &retNum);
-	return retNum - 1;
-
-
-}
-
 
 int main(int argc , char *argv[])
 {
-    int sock[DEFAULT_THREADSNUM],read_size,i;
-    struct sockaddr_in server;
-    char *message = "this is a test";
+    int threadsNumber = DEFAULT_THREADSNUM;
     char *mes = "1";
-    char available_files[DEFAULT_BUFLEN], serverMessage[DEFAULT_BUFLEN];
-    Packet threadPacket[DEFAULT_THREADSNUM];
-    void *argPacket;
+    
+  
+    if( argc == 2)
+    {
+        threadsNumber = atoi(argv[1]);
+    }
+    else if (argc >= 3)
+    {
+        threadsNumber = atoi(argv[1]);
+	mes = argv[2];    	
+    }
 
+    int *sock,read_size,i;
+    struct sockaddr_in server;
+    char *message = "starting message";
+    char available_files[DEFAULT_BUFLEN], serverMessage[DEFAULT_BUFLEN];
+    Packet* threadPacket;
+    FILE* fp;
+    void *argPacket;
+    sock = (int *) malloc( threadsNumber * sizeof(int));
+    threadPacket = (Packet*) malloc( threadsNumber * sizeof(Packet));
+    
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
     server.sin_family = AF_INET;
     server.sin_port = htons(DEFAULT_PORT);
+    
 
     //Connect to remote server
-    for( i =0; i <DEFAULT_THREADSNUM; i++)
+    for( i =0; i < threadsNumber; i++)
     {
 
     	//Create socket
@@ -124,11 +121,15 @@ int main(int argc , char *argv[])
     }
    			
      (read_size = recv(sock[0] , serverMessage , DEFAULT_BUFLEN , 0)); 
-    {
-        printf("Bytes received: %d\n", read_size);
-    }
+    
+     if(read_size <= 0)
+	{
+		puts("Recieve failed");
+		return 1;
+	}
+    
  
-    int threadsNumber = atoi(serverMessage);
+    threadsNumber = atoi(serverMessage);
     printf("Message recieved: %s\n",serverMessage);
    
 
@@ -140,13 +141,12 @@ int main(int argc , char *argv[])
 		puts("Recieve failed");
 		return 1;
 	}
-    {
-        printf("Bytes received: %d\n", read_size);
-    }
+   
+   
+  
     printf("Message recieved: %s\n",available_files);
 	
-    snprintf(mes,12,"%d",meniFunction(available_files));
-
+    
    //Send some data
     if( send(sock[0] , mes , strlen(mes), 0) < 0)
     {
@@ -161,9 +161,6 @@ int main(int argc , char *argv[])
 		puts("Recieve failed");
 		return 1;
 	}
-    {
-        printf("Bytes received: %d\n", read_size);
-    }
     printf("Message recieved: %s\n",available_files);
     
    int size = atoi(available_files); 
@@ -173,28 +170,76 @@ int main(int argc , char *argv[])
     
 	pthread_t *tid =(pthread_t*) malloc(threadsNumber * sizeof(pthread_t));
 
+    clock_t before = clock(), difference;
+
     for(i=0; i< threadsNumber; i++)
     {
     
 		    
 		threadPacket[i].socket = sock[i];
 		if( i != (threadsNumber -1))
-		     threadPacket[i].length = size/DEFAULT_THREADSNUM;
+		     threadPacket[i].length = size/threadsNumber;
 		else
-		     threadPacket[i].length = size - (size / DEFAULT_THREADSNUM * (threadsNumber - 1)) + 2;
+		     threadPacket[i].length = size - (size / threadsNumber * (threadsNumber - 1)) + 2;
 		
-		printf("LEngt %d of %d",threadPacket[i].length,i);
 		argPacket= &threadPacket[i];
 
 		pthread_create(&(tid[i]),NULL,&recievingThread,argPacket); 
 	       
-    }    
+    }
+
+        
+
+
+
+
     for(i= 0; i < threadsNumber; i++)
     {
 	pthread_join(tid[i],NULL); 
     } 
 
-    for(i=0; i< DEFAULT_THREADSNUM; i++)
+    // making a file 
+    int counter = 0;
+    fp = fopen("DownloadedFile", "a");
+
+    if (fp == NULL)
+    {
+    	printf("Can't open Downloaded File");
+	return 1;
+    
+    }
+
+    	while(counter < threadsNumber)
+	{
+		
+		for( i = 0; i< threadsNumber; i++)
+		{
+			if(threadPacket[i].message[1] ==('0'+ counter))
+			{
+				fprintf(fp,"%s", &threadPacket[i].message[3]);
+			}	
+		
+		}
+		
+		counter++;	
+	}
+    	
+    
+    
+    
+	fclose(fp);
+
+	difference = clock() - before;
+	int milliSeconds = difference * 1000/CLOCKS_PER_SEC;
+	printf("I took me : %d seconds and %d milliseconds to download your file\n",milliSeconds /1000, milliSeconds %1000);
+
+	
+	FILE * plotFile = fopen("plot","a");
+
+	fprintf(plotFile,"threads = %d  time: seconds: %d, milliseconds %d ;\n",threadsNumber,milliSeconds /1000, milliSeconds %1000);
+    
+	fclose(plotFile);
+	for(i=0; i< threadsNumber ; i++)
     	close(sock[i]);
     
     return 0;

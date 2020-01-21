@@ -24,13 +24,13 @@
 #include<pthread.h>
 #include<stdlib.h>
 
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27018
+#define DEFAULT_BUFLEN 20000
+#define DEFAULT_PORT   27019
 #define MAX_FILES 20
 #define FILES_NUMBER 4
 #define MESSAGE_ID "[%d]"
 #define DEFAULT_FLEN 30
-#define DEFAULT_THREADSNUM 3 
+#define DEFAULT_THREADSNUM 10
 #define T_SIZE 51
 
 pthread_mutex_t lock;
@@ -50,7 +50,6 @@ void *sendingThread(void *arg_packet)
 	Packet* sendingData = arg_packet;
 	char recievedMessage[DEFAULT_BUFLEN];
 
-	pthread_mutex_lock(&lock);
 
 	if( send( sendingData->socket , sendingData->message , strlen(sendingData->message ) ,0 ) < 0 ) 
     		{
@@ -65,7 +64,6 @@ void *sendingThread(void *arg_packet)
 	}
 	printf("message recieved %s \n",recievedMessage);
 	
-	pthread_mutex_unlock(&lock);
 
 	return NULL;
 }
@@ -101,9 +99,9 @@ void fileChunking(FILE * argFp, int argBegin, int argEnd, char (* argBuffer)[DEF
 
 int main(int argc , char *argv[])
 {
-    int socket_desc , client_sock[DEFAULT_THREADSNUM] , c , read_size,threadsNumber,i;
+    int socket_desc , *client_sock , c , read_size,threadsNumber,i;
     char client_message[DEFAULT_BUFLEN],availableFiles[DEFAULT_BUFLEN],serverMessage[DEFAULT_BUFLEN];
-    char availableFilesArr[FILES_NUMBER][DEFAULT_BUFLEN] = {"Need for speed","Slenderman","JazzJackabit","Fifa08"};
+    char availableFilesArr[FILES_NUMBER][DEFAULT_BUFLEN] = {"NFS","Slenderman","JazzJackabit","Fifa08"};
     char fileName[DEFAULT_FLEN];
     FILE *fp; 
     struct sockaddr_in server ,client;
@@ -118,6 +116,8 @@ int main(int argc , char *argv[])
     	threadsNumber = atoi(argv[1]);
     }
     
+    client_sock = (int *) malloc( threadsNumber * sizeof(int));
+
     printf("Downloading threads number is %d ", threadsNumber);
 
 
@@ -142,14 +142,14 @@ int main(int argc , char *argv[])
     puts("bind done");
 
     //Listen (socket,num.  of max connections)
-    listen(socket_desc , DEFAULT_THREADSNUM);
+    listen(socket_desc , threadsNumber);
 
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
 
     //accept connection from an incoming client
-    for( i=0; i < DEFAULT_THREADSNUM; i++){ 
+    for( i=0; i < threadsNumber; i++){ 
 	    
 	    client_sock[i] = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
 	    
@@ -166,11 +166,6 @@ int main(int argc , char *argv[])
 
   /////////////////////////////////////////////////////////////////////////////
    
-  if (pthread_mutex_init(&lock, NULL) != 0)
-    {
-        printf("\n mutex init failed\n");
-        return 1;
-    }
 
     while( (read_size = recv(client_sock[0] , client_message , DEFAULT_BUFLEN , 0)) > 0 )
     {
@@ -241,13 +236,12 @@ int main(int argc , char *argv[])
 	memset(serverMessage,0,strlen(serverMessage));
 	sprintf(serverMessage,"%d",size);
 	puts(serverMessage);
-	// Sending msg lent 
+	// Sending msg length 
 	if(send(client_sock[0], serverMessage, sizeof(serverMessage), 0) < 0) 
     	{
     		puts("Send failed");
 		return 1;	
     	}
-    	printf("messages lenth sent  \n");
 	
 	for(i= 0; i < threadsNumber; i++)
 	{	
@@ -278,7 +272,6 @@ int main(int argc , char *argv[])
    	free( tid);
     }
  
-   pthread_mutex_destroy(&lock); 
   
 
     if(read_size == 0)
