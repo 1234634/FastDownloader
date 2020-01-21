@@ -190,7 +190,8 @@ int main(int argc , char *argv[])
 	for( i=0; i <  FILES_NUMBER; i++)
 	{	
 		strcat(availableFiles,availableFilesArr[i]);
-		strcat(availableFiles," ; ");
+		if(i != FILES_NUMBER -1)
+			strcat(availableFiles," ; ");
 	}
 	
 	//Sending available files

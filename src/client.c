@@ -43,8 +43,6 @@ void *recievingThread(void *arg_packet)
 	char confirmMessage[DEFAULT_BUFLEN];
 	strcpy(confirmMessage,"Confirming the transaction");
 
-	//	pthread_mutex_lock(&lock);
-//recievedData->length 
 		
 	if(recv(recievedData->socket , recievedData->message ,recievedData->length, 0) <= 0)
 	{
@@ -59,9 +57,29 @@ void *recievingThread(void *arg_packet)
 			exit(0);	
    	 	}
 	
-	//pthread_mutex_unlock(&lock);
-
 	return NULL;
+}
+
+int meniFunction(char argAvailableFiles[DEFAULT_BUFLEN])
+{
+	printf("U meniju ste unesite redni broj fajla:\n\n");
+	
+	char* token = strtok(argAvailableFiles, ";");
+	int i =1,retNum = 0 ;
+
+	while (token != NULL)
+	{
+		printf("%d ",i);
+		puts(token);
+		i++;
+		token = strtok(NULL,";");
+	}
+
+	
+	scanf("%d", &retNum);
+	return retNum - 1;
+
+
 }
 
 
@@ -71,7 +89,7 @@ int main(int argc , char *argv[])
     struct sockaddr_in server;
     char *message = "this is a test";
     char *mes = "1";
-    char available_files[DEFAULT_BUFLEN];
+    char available_files[DEFAULT_BUFLEN], serverMessage[DEFAULT_BUFLEN];
     Packet threadPacket[DEFAULT_THREADSNUM];
     void *argPacket;
 
@@ -105,13 +123,13 @@ int main(int argc , char *argv[])
         return 1;
     }
    			
-     (read_size = recv(sock[0] , available_files , DEFAULT_BUFLEN , 0)); 
+     (read_size = recv(sock[0] , serverMessage , DEFAULT_BUFLEN , 0)); 
     {
         printf("Bytes received: %d\n", read_size);
     }
  
-    int threadsNumber = atoi(available_files);
-    printf("Message recieved: %s\n",available_files);
+    int threadsNumber = atoi(serverMessage);
+    printf("Message recieved: %s\n",serverMessage);
    
 
     memset(available_files,0,sizeof(available_files));
@@ -126,6 +144,9 @@ int main(int argc , char *argv[])
         printf("Bytes received: %d\n", read_size);
     }
     printf("Message recieved: %s\n",available_files);
+	
+    snprintf(mes,12,"%d",meniFunction(available_files));
+
    //Send some data
     if( send(sock[0] , mes , strlen(mes), 0) < 0)
     {
