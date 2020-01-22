@@ -1,5 +1,16 @@
 # FastDownloader
 Downloader that downloads fast.  
+If you are using 2 raspberry pies in first type:
+sudo make server_clean
+sudo make server
+./server arg1
+
+In second one:
+sudo make client_clean
+sudo make client
+./client arg1 arg2
+
+arg1- threadsNumber arg2-FileNumber
 
 First type when in src folder: chmod u+x makeAndRun  
 chmod u+x compile  
