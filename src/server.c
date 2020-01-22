@@ -153,7 +153,7 @@ int main(int argc , char *argv[])
 	    
 	    client_sock[i] = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
 	    
-	    if (client_sock < 0)
+	    if (client_sock[i] < 0)
 	    {
 		perror("accept failed ");
 		return 1;
@@ -162,9 +162,6 @@ int main(int argc , char *argv[])
 	    puts("Connection  accepted");
   
     }
-
-
-  /////////////////////////////////////////////////////////////////////////////
    
 
     while( (read_size = recv(client_sock[0] , client_message , DEFAULT_BUFLEN , 0)) > 0 )
