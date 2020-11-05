@@ -23,6 +23,6 @@ This example will run 5 threads to download file number 3.
 
  
  
-novi edit
-  
+edit
+i neki txt  
 
